@@ -20,11 +20,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
+#To do list:
+#    - pulire contrasto, aumentare precisione
+#    - trovare sistema di verifica dati (pdf da drawbot o disegno in ufo copia)
+#    - angolo spessore minimo
+#    - ascendenti
+#    - discendenti
+#    - espansioni (n, o, R, O)
+
 
 ### Importazione moduli esterni
 import robofab
 from robofab.world import *
-from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength
+from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength 
 from operator import itemgetter
 from math import fabs, hypot
 import sys
@@ -63,6 +71,46 @@ class typeStats:
         flattenGlyph(glyph_copy, precision)
         
         return glyph_copy
+        
+    def contourLength(self, con): # _estimateCubicCurveLength(pt0, pt1, pt2, pt3, precision=10)
+        
+        # Lista vuota che dovrà accogliere le misure
+        lista_misure = [] 
+        
+        # Dichiarazione punto di partenza del tracciato
+        begin = con.points[0]
+        
+        # Ciclo che itera sui segmenti
+        for seg in con:
+            
+            # Curve di terzo grado
+            if len(seg.points) == 3:
+                misura = _estimateCubicCurveLength((begin.x, begin.y), 
+                                                   (seg[0].x, seg[0].y), 
+                                                   (seg[1].x, seg[1].y), 
+                                                   (seg[2].x, seg[2].y), 
+                                                    precision=10)
+
+                # Avanzamento punto di partenza del calcolo
+                begin = seg[2]
+            
+            elif len(seg.points) == 1:
+                # Calcolo della lunghezza del segmento mediante Pitagora
+                misura = hypot((begin.x - seg[0].x), (begin.y - seg[0].y))
+                                
+                # Avanzamento punto di partenza del calcolo 
+                begin = seg[0]
+                
+            else:
+                print "Errore, c'è un problema"
+        
+            # Collezionamento delle lunghezze
+            lista_misure.append(misura)
+        
+        # Sommatoria delle misure prese
+        length = sum(lista_misure)
+        
+        return length
     
 
     # Funzione per il calcolo dell'xHeight minuscola
@@ -134,7 +182,10 @@ class typeStats:
         
         
     # Funzione in grado di estrarre il valore di contrasto da un carattere
-    def contrast(self, contrast):
+    def contrast(self, font):
+        
+        # Glifo della cassa
+        o = font['o']
         
         # Copia appiattita su cui fare le misurazioni
         o_copy = stats.copyAndFlat('o', font, 10)
@@ -148,8 +199,8 @@ class typeStats:
         len_1 = len(o_copy[1].points)
         
         # Creazione livelli interno/esterno
-        livello_esterno = o_copy.getLayer('esterno', clear=True)
-        livello_interno = o_copy.getLayer('interno', clear=True)
+        livello_esterno = o.getLayer('esterno', clear=True)
+        livello_interno = o.getLayer('interno', clear=True)
         
         # Travaso contorni
         if len_0 > len_1:
@@ -158,8 +209,8 @@ class typeStats:
             contorno_interno = o_copy[1].points
             
             # Copia contorni nei livelli di destinazione
-            livello_esterno.appendContour(o_copy[0])
-            livello_interno.appendContour(o_copy[1])
+            livello_esterno.appendContour(o[0])
+            livello_interno.appendContour(o[1])
             
         elif len_0 < len_1:
             # Copia coordinate punti per calcolo distanza minore
@@ -167,8 +218,8 @@ class typeStats:
             contorno_interno = o_copy[0].points
             
             # Copia contorni nei livelli di destinazione
-            livello_esterno.appendContour(o_copy[1])
-            livello_interno.appendContour(o_copy[0])
+            livello_esterno.appendContour(o[1])
+            livello_interno.appendContour(o[0])
         
         else:
             print "Errore"
@@ -193,23 +244,63 @@ class typeStats:
         spessore_minimo = distanze[0]
         
         ## Calcolo spessore maggiore
-        
         # Appiattimento livello con contorno interno
         flattenGlyph(livello_interno, 10)
+        numero_punti_interno = len(livello_interno[0])
         
-        print livello_esterno[0].length
+        # Calcolo della lunghezza del contorno esterno
+        length_esterno = stats.contourLength(livello_esterno[0])
         
+        # Lunghezza segmenti contorno esterno
+        d = length_esterno / numero_punti_interno
         
-        #for con in o_copy:
-        #    len_1 = len(con.points)
-        #    for pt in con.points:
-                
-                
-        #        print pt.x, pt.y
+        # Appiattimento "controllato" del contorno esterno
+        flattenGlyph(livello_esterno, d)
         
+        # Correzione della direzione dei contorni
+        livello_interno.correctDirection()
+        livello_esterno.correctDirection()
         
+        # Verifica della corretta direzione
+        if livello_interno[0].clockwise == livello_esterno[0].clockwise:
+            pass
+        else:
+            print "c'è un errore!"
         
-        contrast = 10
+        # Contorno con numero inferiore di punti
+        if len(livello_interno[0]) <= len(livello_esterno[0]):
+            len_min = len(livello_interno[0])
+        elif len(livello_interno[0]) > len(livello_esterno[0]):
+            len_min = len(livello_esterno[0])
+        
+        # Ciclo che itera sul numero di punti
+        lista_distanze = []
+        for i in range(len_min-1):
+            
+            # Punti interessati
+            x1 = livello_interno[0].points[i].x
+            y1 = livello_interno[0].points[i].y
+            
+            x2 = livello_esterno[0].points[i].x
+            y2 = livello_esterno[0].points[i].y
+            
+            # Calcolo della distanza fra punti contrapposti
+            distanza = hypot((x1-x2),(y1-y2))
+            
+            # Inserimento della misura nella lista deputata
+            lista_distanze.append(distanza)
+            
+        # Riordino della lista per valori
+        lista_distanze.sort()
+        
+        # Estrazione dello spessore minore e di quello maggiore
+        spessore_minore = lista_distanze[0]
+        spessore_maggiore = lista_distanze[-1]
+        
+        # Calcolo del contrasto
+        contrast = spessore_minore / spessore_maggiore      
+        
+        # Restituzione del valore
         return contrast
 
 
@@ -219,6 +310,11 @@ font = CurrentFont()
 ### Istruzioni
 # Invocazione della classe
 stats = typeStats()
+
+# Lunghezza di un contorno
+contorno1 = font['a'][0]
+contourLength = stats.contourLength(contorno1)
+print "Contorno:\t", contourLength
 
 # xHeight minuscola
 xHeight_lowercase = stats.xHeight(font, 'lowercase')
@@ -234,5 +330,4 @@ print "Peso:\t\t", weight
 
 # Contrasto del carattere
 contrasto = stats.contrast(font)
-print "Contrato:\t", contrasto
-
+print "Contrasto:\t", contrasto

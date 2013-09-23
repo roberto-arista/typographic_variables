@@ -9,3 +9,5 @@ The files in the "scripts" folder are licensed under the [MIT License](http://op
 
 `ISIA Urbino - Prot. n. 1727 A.2`
 
+
+At the moment, the "scripts" files are not ready for use, I am working on moving the work on another platform. From Nodebox1 to Robofab/Robofont.

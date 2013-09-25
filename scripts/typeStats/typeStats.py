@@ -21,11 +21,9 @@ THE SOFTWARE.
 """
 
 #To do list:
-#    - angolo spessore minimo
-#    - overshooting
-#    - ascendenti
-#    - discendenti
 #    - espansioni (n, o, R, O)
+#   - funzione lista punti di ancoraggio
+#   - verifiche visive, ascendenti, discendenti, overshooting, espansioni
 
 
 ### Importazione moduli esterni
@@ -33,7 +31,7 @@ import robofab
 from robofab.world import *
 from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength 
 from operator import itemgetter
-from math import fabs, hypot
+from math import fabs, hypot, atan, degrees
 import sys
 
 ### Classi e funzioni
@@ -58,6 +56,52 @@ class typeStats:
         temp_font = font.copy()
         
         return temp_font
+        
+    def angle_segment(self, punto1, punto2):
+        # Calcolo del coefficiente angolare della retta
+        if int(punto1[0]) != int(punto2[0]):
+    		m = degrees(atan((-punto2[1]+punto1[1])/(punto2[0]-punto1[0])))-90
+    		
+    		if -180 <= m < -90:
+    			m = (m+180)
+    		elif 180 >= m > 90:
+    			m = (m-180)
+    	else:
+    		m = 0
+    	
+    	# Restituzione dell'angolo
+    	return m
+    
+    # Filtro dei punti (mode == x, y, xy)
+    def filter_points(self, glyph, mode):
+        
+        # Creazione di una lista che accoglierà i dati
+        list_points = []
+        
+        # Ciclo che itera sui contorni del glifo
+        for con in glyph:
+            
+            # Ciclo che itera sui punti del glifo
+            for pt in con.points:
+                
+                # Selezione dei punti di ancoraggio
+                if pt.type != 'offCurve':
+                    
+                    # Filtro della tipologia di punto
+                    if mode == 'x':
+                        list_points.append(pt.x)
+                    
+                    elif mode == 'y':
+                        list_points.append(pt.y)
+                    
+                    elif mode == 'xy':
+                        list_points.append((pt.x, pt.y))
+                    
+                    else:
+                        print "C'è un errore"
+        
+        # Restituzione lista
+        return list_points
         
     # Funzione che copia il glifo in una nuova cassa e lo appiattisce
     def copyAndFlat(self, glyphName, font, precision):
@@ -130,6 +174,35 @@ class typeStats:
         # Chiusura del tracciato ed aggiornamento
         pen.closePath()
         glyph.update()
+        
+    # Procedura che separa correttamente contorno interno/esterno della o
+    def contours_separation(self, font, glyph):
+    
+        # Calcolo delle lunghezze dei contorni    
+        contourLength_0 = stats.contourLength(glyph[0])
+        contourLength_1 = stats.contourLength(glyph[1])
+        
+        # Creazione livelli interno/esterno
+        livello_esterno = glyph.getLayer('esterno', clear=True)
+        livello_interno = glyph.getLayer('interno', clear=True)
+        
+        # Travaso contorni
+        if contourLength_0 > contourLength_1:
+            # Copia contorni nei livelli di destinazione
+            livello_esterno.appendContour(glyph[0])
+            livello_interno.appendContour(glyph[1])
+            
+        elif contourLength_0 < contourLength_1:
+            # Copia contorni nei livelli di destinazione
+            livello_esterno.appendContour(glyph[1])
+            livello_interno.appendContour(glyph[0])
+        
+        else:
+            print "Errore"
+            sys.exit()
+        
+        # Restituzione dei livelli 
+        return livello_interno, livello_esterno
     
 
     # Funzione per il calcolo dell'xHeight minuscola
@@ -144,17 +217,8 @@ class typeStats:
             print "C'è un errore!"
             sys.exit()
         
-        # Ciclo che itera sui contorni della x
-        list_y = [] # Creazione di una lista in cui collezionare i dati
-        for con in x:
-            for pt in con.points:
-                
-                # Collezione delle ordinate dei punti di ancoraggio, non manipolatori
-                if pt.type != 'offCurve':
-                    list_y.append(pt.y)
-        
-        # Riordinamento della lista (crescente)
-        list_y.sort()
+        # Estrazione delle ordinate dal glifo
+        list_y = stats.filter_points(x, 'y')
         
         # Eliminazione dei multipli
         set_y = set(list_y)
@@ -185,12 +249,10 @@ class typeStats:
         # Copia appiattita su cui fare le misurazioni
         l_copy = stats.copyAndFlat('l', font, 10)
         
-        # Raccolta delle ascisse in una lista
-        list_x = []
-        for con in l_copy:
-            for pt in con.points:
-                list_x.append(round(pt.x, 0))
-        
+        # Filtraggio e arrotondamento delle ascisse dei punti di ancoraggio
+        list_x = stats.filter_points(l_copy, 'x')
+        list_x = [round(x, 0) for x in list_x]
+
         # Creazione di un dizionario che colleziona le occorrenze di valori della lista
         occurrences = stats.occurDict(list_x)
         
@@ -214,37 +276,11 @@ class typeStats:
         
     # Funzione in grado di estrarre il valore di contrasto da un carattere
     def contrast(self, font):
-        
         # Glifo della cassa
         o = font['o']
-        print o
         
-        # Copia appiattita su cui fare la valutazione interno/esterno
-        o_flat = stats.copyAndFlat('o', font, 10)
-        print o_flat
-        
-        # Valutazione automatica interno/esterno
-        len_0 = len(o_flat[0].points)
-        len_1 = len(o_flat[1].points)
-        
-        # Creazione livelli interno/esterno
-        livello_esterno = o.getLayer('esterno', clear=True)
-        livello_interno = o.getLayer('interno', clear=True)
-        
-        # Travaso contorni
-        if len_0 > len_1:
-            # Copia contorni nei livelli di destinazione
-            livello_esterno.appendContour(o[0])
-            livello_interno.appendContour(o[1])
-            
-        elif len_0 < len_1:
-            # Copia contorni nei livelli di destinazione
-            livello_esterno.appendContour(o[1])
-            livello_interno.appendContour(o[0])
-        
-        else:
-            print "Errore"
-            sys.exit()
+        # Separazione dei contorni
+        livello_interno, livello_esterno = stats.contours_separation(font, o)
                 
         # Appiattimento livello con contorno interno
         flattenGlyph(livello_interno, 10)
@@ -321,8 +357,8 @@ class typeStats:
         # Calcolo del contrasto
         contrast = spessore_minore/spessore_maggiore
         
-        print lista_distanze[-1][0][0][0]
-        print lista_distanze[-1][0][0][1]
+        # Calcolo dell'angolo dello spessore minimo
+        angle_min_thick = stats.angle_segment(lista_distanze[0][0][0], lista_distanze[0][0][1])
         
         # Verifica visiva della misurazione
         o_stats = o.getLayer('stats', clear = True)
@@ -332,40 +368,261 @@ class typeStats:
         stats.rect(o_stats, lista_distanze[-1][0][1][0], lista_distanze[-1][0][1][1], 2, 2) # Maggiore
         
         # Restituzione del valore
-        return contrast
+        return contrast, angle_min_thick
+        
+    def overshooting(self, font, xHeight, posizione):
+        # Apertura del glifo nella cassa
+        o = font['o']
+        
+        # Coordinate dei punti di ancoraggio del glifo
+        lista_xy = stats.filter_points(o, 'xy')
+                    
+        # Riordinamento secondo l'ordinata
+        lista_xy = sorted(lista_xy, key=itemgetter(1))
+        
+        # Controllo della posizione e dichiarazione della variabile
+        if posizione == 'inferiore':
+            estremo = lista_xy[0]
+            overshooting = fabs(estremo[1])
+            
+        elif posizione == 'superiore':
+            estremo = lista_xy[-1]
+            overshooting = estremo[1] - xHeight
+            
+        else:
+            print "C'è un errore"
+            sys.exit()
+        
+        # Restituzione del valore
+        return overshooting
+    
+    def ascenders(self, font, overshooting_superiore):
+        
+        # Apertura del glifo in cassa
+        f = font['f']
+        
+        # Coordinate punti di ancoraggio del glifo
+        list_y = stats.filter_points(f, 'y')
+        
+        # Riordino della lista in base alle esigenze di misurazione
+        list_y.sort(reverse=True)
+        
+        # Dichiarazione della variabile
+        ascenders = list_y[0]-overshooting_superiore
+        
+        # Restituzione della variabile
+        return ascenders
+    
+    def descenders(self, font):
+        # Apertura del glifo in cassa
+        p = font['p']
+        
+        # Coordinate delle ordinate dei punti di ancoraggio del glifo
+        list_y = stats.filter_points(p, 'y')
+        
+        # Eliminazione dei multipli
+        set_y = set(list_y)
+        
+        # Riconversione in lista e riordinamento
+        list_y = list(set_y)
+        list_y.sort(reverse=True)
+        
+        # Verifica della presenza di una grazia
+        if (list_y[-1] - list_y[-2]) < 5:
+            descenders = (list_y[-1] + list_y[-2])/2.0
+        else:
+            descenders = list_y[-1]
+        
+        # Restituzione della variabile
+        return descenders
+        
+    def exp_n(self, font):
+        # Apertura glifo nella cassa
+        n = font['n']
+        
+        # Copia appiattita 
+        n_flat = stats.copyAndFlat('n', font, 10)
+        
+        # Ascisse dei punti di ancoraggio del glifo
+        list_x = stats.filter_points(n_flat, 'x')
+        
+        # Riordino per occorrenze
+        dizio_punti = stats.occurDict(list_x)
+        
+        # Riordino della lista
+        lista_x_riordinata = sorted(dizio_punti.items(), key=itemgetter(1))
+        
+        # Estrazione estremi delle aste
+        estremi_aste = lista_x_riordinata[-4:]
+        
+        # Riordinamento lista per valore di ascissa
+        estremi_aste = sorted(estremi_aste, key=itemgetter(0))
+        
+        # Punti medi
+        punto_medio_sin = (estremi_aste[0][0] + estremi_aste[1][0])/2.0
+        punto_medio_des = (estremi_aste[2][0] + estremi_aste[3][0])/2.0
+        
+        # Espansione
+        expansion_n = (punto_medio_des+punto_medio_sin)/2.0
+        
+        # Verifica visiva della misurazione --> Punti medi ed estremi
+        n_stats = n.getLayer('stats', clear = True)
+        
+        # Punti medi
+        stats.rect(n_stats, punto_medio_sin, n.box[3]/2.0, 2, 2) # Sinistro
+        stats.rect(n_stats, punto_medio_des, n.box[3]/2.0, 2, 2) # Destro
+        
+        # Estremi aste
+        stats.rect(n_stats, estremi_aste[0][0], n.box[3]/3.0, 2, 2) 
+        stats.rect(n_stats, estremi_aste[1][0], n.box[3]/3.0, 2, 2)
+        stats.rect(n_stats, estremi_aste[2][0], n.box[3]/3.0, 2, 2)
+        stats.rect(n_stats, estremi_aste[3][0], n.box[3]/3.0, 2, 2)
+        
+        # Restituzione variabile
+        return expansion_n
+        
+    
+    def exp_o(self, font, case): # Aggiungere case
+        
+        # Apertura del glifo nella cassa
+        if case == 'lowercase':
+            o = font['o']
+        elif case == 'uppercase':
+            o = font['O']
+        else:
+            print "c'è un errore"
+            sys.exit()
+        
+        livello_interno, livello_esterno = stats.contours_separation(font, o)
+        
+        # Ascisse dei punti di ancoraggio del contorno esterno della lettera
+        list_x_esterno = stats.filter_points(livello_esterno, 'x')
+        
+        # Ascisse dei punti di ancoraggio del contorno interno della lettera
+        list_x_interno = stats.filter_points(livello_interno, 'x')
+        
+        # Riordino della liste
+        list_x_esterno.sort()
+        list_x_interno.sort()
+        
+        # Calcolo punti medi
+        punto_medio_sinistro = (list_x_interno[0] + list_x_esterno[0])/2.0
+        punto_medio_destro = (list_x_interno[-1] + list_x_esterno[-1])/2.0
+        
+        # Dichiarazione variabile
+        expansion_o = (punto_medio_sinistro + punto_medio_destro)/2.0
+        
+        # Verifica visiva
+        o_stats = o.getLayer('stats', clear = True)
+        
+        # Punti medi
+        stats.rect(o_stats, punto_medio_sinistro, o.box[3]/2.0, 2, 2)
+        stats.rect(o_stats, punto_medio_destro, o.box[3]/2.0, 2, 2)
+        
+        # Estremi
+        stats.rect(o_stats, list_x_interno[0], o.box[3]/3.0, 2, 2)
+        stats.rect(o_stats, list_x_esterno[0], o.box[3]/3.0, 2, 2)
+        stats.rect(o_stats, list_x_interno[-1], o.box[3]/3.0, 2, 2)
+        stats.rect(o_stats, list_x_esterno[-1], o.box[3]/3.0, 2, 2)
+        
+        # Restituzione variabile
+        return expansion_o
+        
+    def exp_R(self, font):
+        
+        # Apertura glifo nella cassa
+        R = font['R']
+        
+        # Separazione dei contorni (interno, esterno)
+        livello_interno, livello_esterno = stats.contours_separation(font, R)
+        
+        # Appiattimento dei contorni
+        flattenGlyph(livello_interno, 10)
+        flattenGlyph(livello_esterno, 10)
+        
+        # Punto medio sinistro
+        lista_asta_x_sin = occurDict(livello_esterno[0].points)
+        lista_asta_x_des = occurDict(livello_interno[0].points)
+        
+        #
+        # CONTINUARE DA QUI!
+        #
+        
+        # Verifica visiva
+        R_stats = R.getLayer('stats', clear = True)
+        # stats.rect(o_stats, list_x_interno[0], o.box[3]/3.0, 2, 2)
+        
+        # Restituzione variabile
+        return expansion_R
 
 
 ### Variabili
-font = OpenFont('test.ufo')
+# Dichiarazione del percorso della font da analizzare
+input_path = "test.ufo"
 
 ### Istruzioni
+# Apertura del carattere
+font = OpenFont(input_path)
+
 # Invocazione della classe
 stats = typeStats()
 
 # Preparazione misurazione, creazione font di copia su cui lavorare
 temp_font = stats.stats_preparation(font)
-temp_font.save('temp_font.ufo')
+temp_font.save(input_path[:-4]+'_typeStats.ufo')
 
 # Lunghezza di un contorno
 contorno1 = temp_font['a'][0]
 contourLength = stats.contourLength(contorno1)
-print "Contorno:\t", contourLength
+print "Contorno:\t\t\t", contourLength
 
 # xHeight minuscola
-xHeight_lowercase = stats.xHeight(temp_font, 'lowercase')
-print "xHeight:\t", xHeight_lowercase
+xHeight = stats.xHeight(temp_font, 'lowercase')
+print "xHeight:\t\t\t", xHeight
 
 # xHeight maiuscola
-xHeight_uppercase = stats.xHeight(temp_font, 'uppercase')
-print "XHeight:\t", xHeight_uppercase
+capHeight = stats.xHeight(temp_font, 'uppercase')
+print "capHeight:\t\t\t", capHeight
 
 # Peso del carattere 
 weight = stats.weight(temp_font)
-print "Peso:\t\t", weight
+print "Peso:\t\t\t\t", weight
 
 # Contrasto del carattere
-contrasto = stats.contrast(temp_font)
-print "Contrasto:\t", contrasto
+contrasto = stats.contrast(temp_font)[0]
+print "Contrasto:\t\t\t", contrasto
+
+# Angolo spessore minore della 'o'
+angle_min_thick = stats.contrast(temp_font)[1]
+print "Angolo spess min:\t", angle_min_thick
+
+# Calcolo dell'overshooting superiore
+overshooting_superiore = stats.overshooting(temp_font, xHeight, 'superiore')
+print "Overshooting superiore: ", overshooting_superiore
+
+# Calcolo dell'overshooting inferiore
+overshooting_inferiore = stats.overshooting(temp_font, xHeight, 'inferiore')
+print "Overshooting inferiore: ", overshooting_inferiore
+
+# Calcolo degli ascendenti
+ascendenti = stats.ascenders(temp_font, overshooting_superiore)
+print "Ascendenti: ", ascendenti
+
+# Calcolo delle discendenti
+discendenti = stats.descenders(temp_font)
+print "Discendenti: ", discendenti
+
+# Calcolo dell'espansione della 'n'
+espansione_n = stats.exp_n(temp_font)
+print "Espansione n: ", espansione_n
+
+# Calcolo dell'espansione della 'o'
+espansione_o = stats.exp_o(temp_font, 'lowercase')
+print "Espansione o: ", espansione_o
+
+# Calcolo dell'espansione della 'O'
+espansione_O = stats.exp_o(temp_font, 'uppercase')
+print "Espansione O: ", espansione_O
 
 # Salvataggio della font con i parametri di misurazione
-temp_font.save('temp_font.ufo')
+temp_font.save(input_path[:-4]+'_typeStats.ufo')

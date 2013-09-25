@@ -47,6 +47,8 @@
 		<string>background</string>
 		<string>esterno</string>
 		<string>interno</string>
+		<string>stats</string>
+		<string>flat</string>
 	</array>
 	<key>com.typemytype.robofont.segmentType</key>
 	<string>curve</string>

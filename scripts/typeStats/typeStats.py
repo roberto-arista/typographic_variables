@@ -21,9 +21,8 @@ THE SOFTWARE.
 """
 
 #To do list:
-#    - pulire contrasto, aumentare precisione
-#    - trovare sistema di verifica dati (pdf da drawbot o disegno in ufo copia)
 #    - angolo spessore minimo
+#    - overshooting
 #    - ascendenti
 #    - discendenti
 #    - espansioni (n, o, R, O)
@@ -53,27 +52,31 @@ class typeStats:
                 d[i] = 1
         return d
         
+    # Creazione di una font copia in cui lavorare
+    def stats_preparation(self, font):
+        # Copia della font e restituzione
+        temp_font = font.copy()
+        
+        return temp_font
+        
     # Funzione che copia il glifo in una nuova cassa e lo appiattisce
     def copyAndFlat(self, glyphName, font, precision):
-        
         # Apertura glifo
         glyph = font[glyphName]
         
         # Creazione di una cassa temporanea
-        temp_font = robofab.world.RFont(showUI = False)
+        glyph_flat = glyph.getLayer('flat', clear = True)
         
         # Copia del glifo in un'altra font
         glyph_matrix = glyph.copy()
-        temp_font.insertGlyph(glyph_matrix)
+        glyph_flat.appendGlyph(glyph_matrix)
         
         # Appiattimento della copia
-        glyph_copy = temp_font[glyphName]
-        flattenGlyph(glyph_copy, precision)
+        flattenGlyph(glyph_flat, precision)
         
-        return glyph_copy
+        return glyph_flat
         
-    def contourLength(self, con): # _estimateCubicCurveLength(pt0, pt1, pt2, pt3, precision=10)
-        
+    def contourLength(self, con):
         # Lista vuota che dovrà accogliere le misure
         lista_misure = [] 
         
@@ -111,6 +114,22 @@ class typeStats:
         length = sum(lista_misure)
         
         return length
+        
+    # Procedura in grado di disegnare un rettangolo
+    def rect(self, glyph, x_center, y_center, width, height):
+        # Invocazione della penna
+        pen = glyph.getPen()
+        
+        # Disegno
+        pen.moveTo((x_center-width/2.0, y_center+height/2.0))
+        pen.lineTo((x_center+width/2.0, y_center+height/2.0))
+        pen.lineTo((x_center+width/2.0, y_center-height/2.0))
+        pen.lineTo((x_center-width/2.0, y_center-height/2.0))
+        pen.lineTo((x_center-width/2.0, y_center+height/2.0))
+        
+        # Chiusura del tracciato ed aggiornamento
+        pen.closePath()
+        glyph.update()
     
 
     # Funzione per il calcolo dell'xHeight minuscola
@@ -148,6 +167,10 @@ class typeStats:
             xHeight_lowercase = (list_y[-1] + list_y[-2])/2.0
         else:
             xHeight_lowercase = list_y[-1]
+            
+        # Verifica visiva della misurazione
+        x_stats = x.getLayer('stats', clear = True)
+        stats.rect(x_stats, x_stats.width/2.0, xHeight_lowercase, x_stats.width, 2)
         
         # Restituzione dell'xHeight
         return xHeight_lowercase
@@ -155,6 +178,9 @@ class typeStats:
     
     # Definizione della funzione in grado di estrapolare il peso di un carattere
     def weight(self, font):
+        
+        # Invocazione glifo nella cassa
+        l = font['l']
         
         # Copia appiattita su cui fare le misurazioni
         l_copy = stats.copyAndFlat('l', font, 10)
@@ -178,6 +204,11 @@ class typeStats:
         # Travaso del valore in una variabile
         weight = fabs(estremo_2 + estremo_1)/stats.xHeight(font, 'lowercase')
         
+        # Verifica visiva della misurazione
+        l_stats = l.getLayer('stats', clear = True)
+        stats.rect(l_stats, estremo_1-0.5, l.box[3]/2.0, 1, l.box[3])
+        stats.rect(l_stats, estremo_2-0.5, l.box[3]/2.0, 1, l.box[3])
+        
         return weight
         
         
@@ -186,17 +217,15 @@ class typeStats:
         
         # Glifo della cassa
         o = font['o']
+        print o
         
-        # Copia appiattita su cui fare le misurazioni
-        o_copy = stats.copyAndFlat('o', font, 10)
-        
-        # Creazione delle liste in cui collezionare i punti dei contorni
-        lista_punti_esterno = []
-        lista_punti_interno = []
+        # Copia appiattita su cui fare la valutazione interno/esterno
+        o_flat = stats.copyAndFlat('o', font, 10)
+        print o_flat
         
         # Valutazione automatica interno/esterno
-        len_0 = len(o_copy[0].points)
-        len_1 = len(o_copy[1].points)
+        len_0 = len(o_flat[0].points)
+        len_1 = len(o_flat[1].points)
         
         # Creazione livelli interno/esterno
         livello_esterno = o.getLayer('esterno', clear=True)
@@ -204,19 +233,11 @@ class typeStats:
         
         # Travaso contorni
         if len_0 > len_1:
-            # Copia coordinate punti per calcolo distanza minore
-            contorno_esterno = o_copy[0].points
-            contorno_interno = o_copy[1].points
-            
             # Copia contorni nei livelli di destinazione
             livello_esterno.appendContour(o[0])
             livello_interno.appendContour(o[1])
             
         elif len_0 < len_1:
-            # Copia coordinate punti per calcolo distanza minore
-            contorno_esterno = o_copy[1].points
-            contorno_interno = o_copy[0].points
-            
             # Copia contorni nei livelli di destinazione
             livello_esterno.appendContour(o[1])
             livello_interno.appendContour(o[0])
@@ -224,26 +245,7 @@ class typeStats:
         else:
             print "Errore"
             sys.exit()
-            
-        ## Calcolo spessore minore
-        # Ciclo nidiato che itera sui punti di entrambi i contorni
-        distanze = []
-        for pt_est in contorno_esterno:
-            for pt_int in contorno_interno:
                 
-                # Calcolo della distanza sul piano cartesiano
-                distanza = hypot(pt_est.x - pt_int.x, pt_est.y - pt_int.y)
-                
-                # Inserimento della distanza calcolata all'interno di una lista
-                distanze.append(distanza)
-        
-        # Riordinamento lista distanze
-        distanze.sort()
-        
-        # Spessore minimo della 'o'
-        spessore_minimo = distanze[0]
-        
-        ## Calcolo spessore maggiore
         # Appiattimento livello con contorno interno
         flattenGlyph(livello_interno, 10)
         numero_punti_interno = len(livello_interno[0])
@@ -261,11 +263,15 @@ class typeStats:
         livello_interno.correctDirection()
         livello_esterno.correctDirection()
         
+        # Correzione punto di partenza contorni
+        livello_interno[0].autoStartSegment()
+        livello_esterno[0].autoStartSegment()
+        
         # Verifica della corretta direzione
         if livello_interno[0].clockwise == livello_esterno[0].clockwise:
             pass
         else:
-            print "c'è un errore!"
+            print "C'è un errore!"
         
         # Contorno con numero inferiore di punti
         if len(livello_interno[0]) <= len(livello_esterno[0]):
@@ -281,53 +287,85 @@ class typeStats:
             x1 = livello_interno[0].points[i].x
             y1 = livello_interno[0].points[i].y
             
-            x2 = livello_esterno[0].points[i].x
-            y2 = livello_esterno[0].points[i].y
+            lista_distanze_dettaglio = []
+            for l in range(-3, 4): # Estrarre solo quello più corto
+                
+                # Indice di controllo
+                index = i+l
+                    
+                if index >= len_min:
+                    index = index-len_min
+                
+                x2 = livello_esterno[0].points[index].x
+                y2 = livello_esterno[0].points[index].y
             
-            # Calcolo della distanza fra punti contrapposti
-            distanza = hypot((x1-x2),(y1-y2))
+                # Calcolo della distanza fra punti contrapposti
+                distanza = hypot((x1-x2),(y1-y2))
+                
+                # Verifica nel dettaglio
+                lista_distanze_dettaglio.append((((x1, y1), (x2, y2)), distanza))
+            
+            # Riordino lista distanze dettaglio
+            lista_distanze_dettaglio = sorted(lista_distanze_dettaglio, key=itemgetter(1))
             
             # Inserimento della misura nella lista deputata
-            lista_distanze.append(distanza)
+            lista_distanze.append(lista_distanze_dettaglio[0])
             
         # Riordino della lista per valori
-        lista_distanze.sort()
+        lista_distanze = sorted(lista_distanze, key=itemgetter(1))
         
         # Estrazione dello spessore minore e di quello maggiore
-        spessore_minore = lista_distanze[0]
-        spessore_maggiore = lista_distanze[-1]
+        spessore_minore = lista_distanze[0][1]
+        spessore_maggiore = lista_distanze[-1][1]
         
         # Calcolo del contrasto
-        contrast = spessore_minore / spessore_maggiore      
+        contrast = spessore_minore/spessore_maggiore
+        
+        print lista_distanze[-1][0][0][0]
+        print lista_distanze[-1][0][0][1]
+        
+        # Verifica visiva della misurazione
+        o_stats = o.getLayer('stats', clear = True)
+        stats.rect(o_stats, lista_distanze[0][0][0][0], lista_distanze[0][0][0][1], 2, 2) # Minore
+        stats.rect(o_stats, lista_distanze[0][0][1][0], lista_distanze[0][0][1][1], 2, 2) # Minore
+        stats.rect(o_stats, lista_distanze[-1][0][0][0], lista_distanze[-1][0][0][1], 2, 2) # Maggiore
+        stats.rect(o_stats, lista_distanze[-1][0][1][0], lista_distanze[-1][0][1][1], 2, 2) # Maggiore
         
         # Restituzione del valore
         return contrast
 
 
 ### Variabili
-font = CurrentFont()
+font = OpenFont('test.ufo')
 
 ### Istruzioni
 # Invocazione della classe
 stats = typeStats()
 
+# Preparazione misurazione, creazione font di copia su cui lavorare
+temp_font = stats.stats_preparation(font)
+temp_font.save('temp_font.ufo')
+
 # Lunghezza di un contorno
-contorno1 = font['a'][0]
+contorno1 = temp_font['a'][0]
 contourLength = stats.contourLength(contorno1)
 print "Contorno:\t", contourLength
 
 # xHeight minuscola
-xHeight_lowercase = stats.xHeight(font, 'lowercase')
+xHeight_lowercase = stats.xHeight(temp_font, 'lowercase')
 print "xHeight:\t", xHeight_lowercase
 
 # xHeight maiuscola
-xHeight_uppercase = stats.xHeight(font, 'uppercase')
+xHeight_uppercase = stats.xHeight(temp_font, 'uppercase')
 print "XHeight:\t", xHeight_uppercase
 
 # Peso del carattere 
-weight = stats.weight(font)
+weight = stats.weight(temp_font)
 print "Peso:\t\t", weight
 
 # Contrasto del carattere
-contrasto = stats.contrast(font)
+contrasto = stats.contrast(temp_font)
 print "Contrasto:\t", contrasto
+
+# Salvataggio della font con i parametri di misurazione
+temp_font.save('temp_font.ufo')

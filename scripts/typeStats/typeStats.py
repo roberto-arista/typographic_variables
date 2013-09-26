@@ -21,9 +21,8 @@ THE SOFTWARE.
 """
 
 #To do list:
-#    - espansioni (n, o, R, O)
-#   - funzione lista punti di ancoraggio
-#   - verifiche visive, ascendenti, discendenti, overshooting, espansioni
+#   - verifiche visive: ascendenti, discendenti
+#   - rapporti di espansione 
 
 
 ### Importazione moduli esterni
@@ -176,12 +175,12 @@ class typeStats:
         glyph.update()
         
     # Procedura che separa correttamente contorno interno/esterno della o
-    def contours_separation(self, font, glyph):
-    
+    def contours_separation(self, glyph):
+        
         # Calcolo delle lunghezze dei contorni    
         contourLength_0 = stats.contourLength(glyph[0])
         contourLength_1 = stats.contourLength(glyph[1])
-        
+                
         # Creazione livelli interno/esterno
         livello_esterno = glyph.getLayer('esterno', clear=True)
         livello_interno = glyph.getLayer('interno', clear=True)
@@ -280,7 +279,7 @@ class typeStats:
         o = font['o']
         
         # Separazione dei contorni
-        livello_interno, livello_esterno = stats.contours_separation(font, o)
+        livello_interno, livello_esterno = stats.contours_separation(o)
                 
         # Appiattimento livello con contorno interno
         flattenGlyph(livello_interno, 10)
@@ -361,7 +360,7 @@ class typeStats:
         angle_min_thick = stats.angle_segment(lista_distanze[0][0][0], lista_distanze[0][0][1])
         
         # Verifica visiva della misurazione
-        o_stats = o.getLayer('stats', clear = True)
+        o_stats = o.getLayer('stats', clear = False)
         stats.rect(o_stats, lista_distanze[0][0][0][0], lista_distanze[0][0][0][1], 2, 2) # Minore
         stats.rect(o_stats, lista_distanze[0][0][1][0], lista_distanze[0][0][1][1], 2, 2) # Minore
         stats.rect(o_stats, lista_distanze[-1][0][0][0], lista_distanze[-1][0][0][1], 2, 2) # Maggiore
@@ -392,6 +391,14 @@ class typeStats:
         else:
             print "C'è un errore"
             sys.exit()
+            
+        # Verifica visiva
+        o_stats = o.getLayer('stats', clear = False)
+        
+        if posizione == 'inferiore':
+            stats.rect(o_stats, o.width/2.0, -overshooting/2.0, o.width, overshooting)
+        elif posizione == 'superiore':
+            stats.rect(o_stats, o.width/2.0, xHeight+overshooting/2.0, o.width, overshooting)
         
         # Restituzione del valore
         return overshooting
@@ -410,6 +417,8 @@ class typeStats:
         # Dichiarazione della variabile
         ascenders = list_y[0]-overshooting_superiore
         
+        # Verifica visiva    
+        
         # Restituzione della variabile
         return ascenders
     
@@ -425,13 +434,15 @@ class typeStats:
         
         # Riconversione in lista e riordinamento
         list_y = list(set_y)
-        list_y.sort(reverse=True)
+        list_y.sort(reverse = True)
         
         # Verifica della presenza di una grazia
         if (list_y[-1] - list_y[-2]) < 5:
             descenders = (list_y[-1] + list_y[-2])/2.0
         else:
             descenders = list_y[-1]
+            
+        # Verifica visiva
         
         # Restituzione della variabile
         return descenders
@@ -493,7 +504,8 @@ class typeStats:
             print "c'è un errore"
             sys.exit()
         
-        livello_interno, livello_esterno = stats.contours_separation(font, o)
+        # Separazione dei contorni
+        livello_interno, livello_esterno = stats.contours_separation(o)
         
         # Ascisse dei punti di ancoraggio del contorno esterno della lettera
         list_x_esterno = stats.filter_points(livello_esterno, 'x')
@@ -513,7 +525,7 @@ class typeStats:
         expansion_o = (punto_medio_sinistro + punto_medio_destro)/2.0
         
         # Verifica visiva
-        o_stats = o.getLayer('stats', clear = True)
+        o_stats = o.getLayer('stats', clear = False)
         
         # Punti medi
         stats.rect(o_stats, punto_medio_sinistro, o.box[3]/2.0, 2, 2)
@@ -529,28 +541,70 @@ class typeStats:
         return expansion_o
         
     def exp_R(self, font):
-        
+                
         # Apertura glifo nella cassa
         R = font['R']
         
         # Separazione dei contorni (interno, esterno)
-        livello_interno, livello_esterno = stats.contours_separation(font, R)
+        livello_interno, livello_esterno = stats.contours_separation(R)
         
         # Appiattimento dei contorni
         flattenGlyph(livello_interno, 10)
         flattenGlyph(livello_esterno, 10)
+
+        # Selezione delle ascisse dei contorni
+        lista_asta_x_sin = stats.filter_points(livello_esterno, 'x')
+        lista_asta_x_des = stats.filter_points(livello_interno, 'x')
         
-        # Punto medio sinistro
-        lista_asta_x_sin = occurDict(livello_esterno[0].points)
-        lista_asta_x_des = occurDict(livello_interno[0].points)
+        # Punto medio sinistro, calcolo occorrenze
+        lista_asta_x_sin = stats.occurDict(lista_asta_x_sin)
+        lista_asta_x_des = stats.occurDict(lista_asta_x_des)
         
-        #
-        # CONTINUARE DA QUI!
-        #
+        # Punto medio sinistro, riordino occorrenze
+        lista_asta_x_sin = sorted(lista_asta_x_sin.items(), key=itemgetter(1), reverse = True)
+        lista_asta_x_des = sorted(lista_asta_x_des.items(), key=itemgetter(1), reverse = True)
+        
+        # Punto medio sinistro, ascissa
+        punto_medio_sin = (lista_asta_x_sin[0][0] + lista_asta_x_des[0][0])/2.0
+        
+        # Punto medio destro
+        lista_pancia_x_sin = stats.filter_points(livello_interno, 'x')
+        lista_pancia_x_des = stats.filter_points(livello_esterno, 'xy')
+        
+        # Punto medio destro, estremo interno
+        estremo_sinistro = max(lista_pancia_x_sin)
+        
+        # estremo superiore
+        lista_pancia_x_des = sorted(lista_pancia_x_des, key=itemgetter(1), reverse=True)
+        estremo_superiore = lista_pancia_x_des[0][1]
+        
+        # Cernita punti appartenenti alla metà superiore della lettera
+        lista_pancia_x_des = [item for item in lista_pancia_x_des if item[1] >= estremo_superiore/2.0]
+        
+        # Riordino della lista per valori di ascissa
+        lista_pancia_x_des = sorted(lista_pancia_x_des, key=itemgetter(0), reverse=True)
+        
+        # Estremo destro pancia
+        estremo_destro = lista_pancia_x_des[0][0]
+        
+        # Punto medio destro
+        punto_medio_des = (estremo_destro + estremo_sinistro)/2.0
+
+        # Espansione della R
+        expansion_R = (punto_medio_des + punto_medio_sin)/2.0
         
         # Verifica visiva
         R_stats = R.getLayer('stats', clear = True)
-        # stats.rect(o_stats, list_x_interno[0], o.box[3]/3.0, 2, 2)
+        
+        # Punti medi
+        stats.rect(R_stats, punto_medio_sin, R.box[3]/1.5, 2, 2)
+        stats.rect(R_stats, punto_medio_des, R.box[3]/1.5, 2, 2)
+        
+        # Estremi
+        stats.rect(R_stats, estremo_sinistro, R.box[3]/2.0, 2, 2)
+        stats.rect(R_stats, estremo_destro, R.box[3]/2.0, 2, 2)
+        stats.rect(R_stats, lista_asta_x_sin[0][0], R.box[3]/2.0, 2, 2)
+        stats.rect(R_stats, lista_asta_x_des[0][0], R.box[3]/2.0, 2, 2)
         
         # Restituzione variabile
         return expansion_R
@@ -562,7 +616,7 @@ input_path = "test.ufo"
 
 ### Istruzioni
 # Apertura del carattere
-font = OpenFont(input_path)
+font = OpenFont(input_path, showUI = True)
 
 # Invocazione della classe
 stats = typeStats()
@@ -623,6 +677,10 @@ print "Espansione o: ", espansione_o
 # Calcolo dell'espansione della 'O'
 espansione_O = stats.exp_o(temp_font, 'uppercase')
 print "Espansione O: ", espansione_O
+
+# Calcolo dell'espansione della 'R'
+espansione_R = stats.exp_R(temp_font)
+print "Espansione R: ", espansione_R
 
 # Salvataggio della font con i parametri di misurazione
 temp_font.save(input_path[:-4]+'_typeStats.ufo')

@@ -21,8 +21,9 @@ THE SOFTWARE.
 """
 
 #To do list:
-#   - verifiche visive: ascendenti, discendenti
-#   - rapporti di espansione 
+#- squadratura media
+#- squadratura interna
+#- squadratura esterna
 
 
 ### Importazione moduli esterni
@@ -108,7 +109,7 @@ class typeStats:
         glyph = font[glyphName]
         
         # Creazione di una cassa temporanea
-        glyph_flat = glyph.getLayer('flat', clear = True)
+        glyph_flat = glyph.getLayer('flat', clear = False)
         
         # Copia del glifo in un'altra font
         glyph_matrix = glyph.copy()
@@ -182,8 +183,8 @@ class typeStats:
         contourLength_1 = stats.contourLength(glyph[1])
                 
         # Creazione livelli interno/esterno
-        livello_esterno = glyph.getLayer('esterno', clear=True)
-        livello_interno = glyph.getLayer('interno', clear=True)
+        livello_esterno = glyph.getLayer('esterno', clear = False)
+        livello_interno = glyph.getLayer('interno', clear = False)
         
         # Travaso contorni
         if contourLength_0 > contourLength_1:
@@ -232,7 +233,7 @@ class typeStats:
             xHeight_lowercase = list_y[-1]
             
         # Verifica visiva della misurazione
-        x_stats = x.getLayer('stats', clear = True)
+        x_stats = x.getLayer('stats', clear = False)
         stats.rect(x_stats, x_stats.width/2.0, xHeight_lowercase, x_stats.width, 2)
         
         # Restituzione dell'xHeight
@@ -266,7 +267,7 @@ class typeStats:
         weight = fabs(estremo_2 + estremo_1)/stats.xHeight(font, 'lowercase')
         
         # Verifica visiva della misurazione
-        l_stats = l.getLayer('stats', clear = True)
+        l_stats = l.getLayer('stats', clear = False)
         stats.rect(l_stats, estremo_1-0.5, l.box[3]/2.0, 1, l.box[3])
         stats.rect(l_stats, estremo_2-0.5, l.box[3]/2.0, 1, l.box[3])
         
@@ -418,6 +419,9 @@ class typeStats:
         ascenders = list_y[0]-overshooting_superiore
         
         # Verifica visiva    
+        f_stats = f.getLayer('stats', clear = False)
+        stats.rect(f_stats, f.width/2.0, ascenders+overshooting_superiore/2.0,f.width, overshooting_superiore)
+        stats.rect(f_stats, f.width/2.0, ascenders/2.0, 2, ascenders) # Altezza ascendenti, senza overshooting
         
         # Restituzione della variabile
         return ascenders
@@ -443,6 +447,8 @@ class typeStats:
             descenders = list_y[-1]
             
         # Verifica visiva
+        p_stats = p.getLayer('stats', clear = False)
+        stats.rect(p_stats, p.width/2.0, descenders-1, p.width, 2)
         
         # Restituzione della variabile
         return descenders
@@ -474,10 +480,10 @@ class typeStats:
         punto_medio_des = (estremi_aste[2][0] + estremi_aste[3][0])/2.0
         
         # Espansione
-        expansion_n = (punto_medio_des+punto_medio_sin)/2.0
+        expansion_n = punto_medio_des - punto_medio_sin
         
         # Verifica visiva della misurazione --> Punti medi ed estremi
-        n_stats = n.getLayer('stats', clear = True)
+        n_stats = n.getLayer('stats', clear = False)
         
         # Punti medi
         stats.rect(n_stats, punto_medio_sin, n.box[3]/2.0, 2, 2) # Sinistro
@@ -522,7 +528,7 @@ class typeStats:
         punto_medio_destro = (list_x_interno[-1] + list_x_esterno[-1])/2.0
         
         # Dichiarazione variabile
-        expansion_o = (punto_medio_sinistro + punto_medio_destro)/2.0
+        expansion_o = punto_medio_destro - punto_medio_sinistro
         
         # Verifica visiva
         o_stats = o.getLayer('stats', clear = False)
@@ -591,10 +597,10 @@ class typeStats:
         punto_medio_des = (estremo_destro + estremo_sinistro)/2.0
 
         # Espansione della R
-        expansion_R = (punto_medio_des + punto_medio_sin)/2.0
+        expansion_R = punto_medio_des - punto_medio_sin
         
         # Verifica visiva
-        R_stats = R.getLayer('stats', clear = True)
+        R_stats = R.getLayer('stats', clear = False)
         
         # Punti medi
         stats.rect(R_stats, punto_medio_sin, R.box[3]/1.5, 2, 2)
@@ -642,13 +648,10 @@ print "capHeight:\t\t\t", capHeight
 weight = stats.weight(temp_font)
 print "Peso:\t\t\t\t", weight
 
-# Contrasto del carattere
-contrasto = stats.contrast(temp_font)[0]
-print "Contrasto:\t\t\t", contrasto
-
-# Angolo spessore minore della 'o'
-angle_min_thick = stats.contrast(temp_font)[1]
-print "Angolo spess min:\t", angle_min_thick
+## Contrasto del carattere e angolo dello spessore minore
+#contrasto, angle_min_thick = stats.contrast(temp_font)
+#print "Contrasto:\t\t\t", contrasto
+#print "Angolo spess min:\t", angle_min_thick
 
 # Calcolo dell'overshooting superiore
 overshooting_superiore = stats.overshooting(temp_font, xHeight, 'superiore')
@@ -674,6 +677,10 @@ print "Espansione n: ", espansione_n
 espansione_o = stats.exp_o(temp_font, 'lowercase')
 print "Espansione o: ", espansione_o
 
+# Rapporto di espansione n/o
+no_ratio = espansione_n / espansione_o
+print "Rapporto no: ", no_ratio
+
 # Calcolo dell'espansione della 'O'
 espansione_O = stats.exp_o(temp_font, 'uppercase')
 print "Espansione O: ", espansione_O
@@ -681,6 +688,10 @@ print "Espansione O: ", espansione_O
 # Calcolo dell'espansione della 'R'
 espansione_R = stats.exp_R(temp_font)
 print "Espansione R: ", espansione_R
+
+# Rapporto di espansione RO
+RO_ratio = espansione_R / espansione_O
+print "Rapporto RO: ", RO_ratio
 
 # Salvataggio della font con i parametri di misurazione
 temp_font.save(input_path[:-4]+'_typeStats.ufo')

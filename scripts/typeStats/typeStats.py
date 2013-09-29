@@ -20,16 +20,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-#To do list:
-#- squadratura media
-#- squadratura interna
-#- squadratura esterna
-
-
 ### Importazione moduli esterni
 import robofab
 from robofab.world import *
-from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength 
+import numpy
+from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength, distance
 from operator import itemgetter
 from math import fabs, hypot, atan, degrees
 import sys
@@ -71,6 +66,16 @@ class typeStats:
     	
     	# Restituzione dell'angolo
     	return m
+    	
+    # Funzione in grado di calcolare l'intersezione fra due segmenti
+    def intersect(self, pt1, pt2, pt3, pt4):
+        try:
+            denom = float((pt1.x - pt2.x) * (pt3.y - pt4.y) - (pt1.y - pt2.y) * (pt3.x - pt4.x))
+            x = ((pt1.x * pt2.y - pt1.y * pt2.x) * (pt3.x - pt4.x) - (pt1.x - pt2.x) * (pt3.x * pt4.y - pt3.y * pt4.x)) / denom
+            y = ((pt1.x * pt2.y - pt1.y * pt2.x) * (pt3.y - pt4.y) - (pt1.y - pt2.y) * (pt3.x * pt4.y - pt3.y * pt4.x)) / denom
+        except ZeroDivisionError:
+            return
+        return x, y
     
     # Filtro dei punti (mode == x, y, xy)
     def filter_points(self, glyph, mode):
@@ -183,8 +188,8 @@ class typeStats:
         contourLength_1 = stats.contourLength(glyph[1])
                 
         # Creazione livelli interno/esterno
-        livello_esterno = glyph.getLayer('esterno', clear = False)
-        livello_interno = glyph.getLayer('interno', clear = False)
+        livello_esterno = glyph.getLayer('esterno', clear = True)
+        livello_interno = glyph.getLayer('interno', clear = True)
         
         # Travaso contorni
         if contourLength_0 > contourLength_1:
@@ -614,6 +619,68 @@ class typeStats:
         
         # Restituzione variabile
         return expansion_R
+        
+    # Funzione in grado di calcolare la squadratura di un contorno (completamente curvo)
+    def contour_squaring(self, glifo_verifica, con):
+        # Ciclo che itera sul contorno interno
+        lista_squadrature = []
+                    
+        # Punto di partenza del contorno
+        pt0 = con.points[0]
+                
+        # Ciclo che itera sui segmenti del contorno
+        for seg in con:
+            if seg.type != 'curve':
+                print "Che ci fa un segmento dritto in una o?"
+                sys.exit()
+                
+            else:
+                pt1 = seg.points[0]
+                pt2 = seg.points[1]
+                pt3 = seg.points[2]
+                
+                # Intersezione manipolatori
+                intersection = stats.intersect(pt0, pt1, pt2, pt3)
+                print intersection
+                
+                # Verifica visiva intersezioni
+                stats.rect(glifo_verifica, intersection[0], intersection[1], 2, 2)
+            
+                # Calcolo del valore di squadratura dei due manipolatori e media dei due
+                sq1 = distance((pt0.x, pt0.y), (pt1.x, pt1.y)) / distance((pt0.x, pt0.y), intersection)
+                sq2 = distance((pt3.x, pt3.y), (pt2.x, pt2.y)) / distance((pt3.x, pt3.y), intersection)
+                sq_avg = (sq1+sq2)/2.0
+                
+                # Inserimento valore di squadratura in lista
+                lista_squadrature.append(sq_avg)
+                
+                # Ridefinizione del punto di partenza della curva
+                pt0 = pt3
+            
+        # Media di tutte le squadrature del contorno
+        sq_contorno = sum(lista_squadrature)/len(lista_squadrature)
+            
+        return sq_contorno
+        
+        
+    def squaring_o(self, font):
+        
+        # Apertura del glifo nella cassa
+        o = font['o']
+        
+        # Separazione dei contorni
+        livello_interno, livello_esterno = stats.contours_separation(o)
+        
+        # Calcolo squadrature
+        glifo_verifica = o.getLayer('squadratura', clear = False)
+        squadratura_interna = stats.contour_squaring(glifo_verifica, livello_interno[0])
+        squadratura_esterna = stats.contour_squaring(glifo_verifica, livello_esterno[0])
+        
+        # Dichiarazione variabili
+        squadratura_media = (squadratura_esterna + squadratura_interna)/2.0
+        
+        # Restituzione variabile
+        return squadratura_media, squadratura_interna, squadratura_esterna
 
 
 ### Variabili
@@ -692,6 +759,12 @@ print "Espansione R: ", espansione_R
 # Rapporto di espansione RO
 RO_ratio = espansione_R / espansione_O
 print "Rapporto RO: ", RO_ratio
+
+# Squadratura media della o
+squaring_o, squaring_int_o, squaring_est_o = stats.squaring_o(temp_font)
+print "Squadratura media della o: ", squaring_o
+print "Squadratura interna della o: ", squaring_int_o
+print "Squadratura esterna della o: ", squaring_est_o
 
 # Salvataggio della font con i parametri di misurazione
 temp_font.save(input_path[:-4]+'_typeStats.ufo')

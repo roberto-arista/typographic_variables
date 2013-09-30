@@ -219,6 +219,51 @@
                 </dict>
               </array>
             </dict>
+            <dict>
+              <key>points</key>
+              <array>
+                <dict>
+                  <key>segmentType</key>
+                  <string>line</string>
+                  <key>smooth</key>
+                  <false/>
+                  <key>x</key>
+                  <real>0.0</real>
+                  <key>y</key>
+                  <real>396.5</real>
+                </dict>
+                <dict>
+                  <key>segmentType</key>
+                  <string>line</string>
+                  <key>smooth</key>
+                  <false/>
+                  <key>x</key>
+                  <real>500.0</real>
+                  <key>y</key>
+                  <real>396.5</real>
+                </dict>
+                <dict>
+                  <key>segmentType</key>
+                  <string>line</string>
+                  <key>smooth</key>
+                  <false/>
+                  <key>x</key>
+                  <real>500.0</real>
+                  <key>y</key>
+                  <real>394.5</real>
+                </dict>
+                <dict>
+                  <key>segmentType</key>
+                  <string>line</string>
+                  <key>smooth</key>
+                  <false/>
+                  <key>x</key>
+                  <real>0.0</real>
+                  <key>y</key>
+                  <real>394.5</real>
+                </dict>
+              </array>
+            </dict>
           </array>
           <key>lib</key>
           <dict>

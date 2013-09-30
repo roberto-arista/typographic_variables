@@ -29,11 +29,14 @@ from operator import itemgetter
 from math import fabs, hypot, atan, degrees
 import sys
 
+
 ### Classi e funzioni
 class typeStats:
-
+    
+    
     def __init__(self):
         return None
+    
     
     # Funzione che riordina un iterabile per occorrenze
     def occurDict(self, items):
@@ -44,6 +47,7 @@ class typeStats:
             else:
                 d[i] = 1
         return d
+    
         
     # Creazione di una font copia in cui lavorare
     def stats_preparation(self, font):
@@ -51,11 +55,13 @@ class typeStats:
         temp_font = font.copy()
         
         return temp_font
+    
         
     def angle_segment(self, punto1, punto2):
         # Calcolo del coefficiente angolare della retta
         if int(punto1[0]) != int(punto2[0]):
-    		m = degrees(atan((-punto2[1]+punto1[1])/(punto2[0]-punto1[0])))-90
+    		m = degrees(atan((-punto2[1]+punto1[1])/
+    		                 (punto2[0]-punto1[0])))-90
     		
     		if -180 <= m < -90:
     			m = (m+180)
@@ -66,16 +72,21 @@ class typeStats:
     	
     	# Restituzione dell'angolo
     	return m
+    
     	
     # Funzione in grado di calcolare l'intersezione fra due segmenti
     def intersect(self, pt1, pt2, pt3, pt4):
         try:
-            denom = float((pt1.x - pt2.x) * (pt3.y - pt4.y) - (pt1.y - pt2.y) * (pt3.x - pt4.x))
-            x = ((pt1.x * pt2.y - pt1.y * pt2.x) * (pt3.x - pt4.x) - (pt1.x - pt2.x) * (pt3.x * pt4.y - pt3.y * pt4.x)) / denom
-            y = ((pt1.x * pt2.y - pt1.y * pt2.x) * (pt3.y - pt4.y) - (pt1.y - pt2.y) * (pt3.x * pt4.y - pt3.y * pt4.x)) / denom
+            denom = float((pt1.x-pt2.x)*(pt3.y-pt4.y)-
+                          (pt1.y-pt2.y)*(pt3.x-pt4.x))
+            x = ((pt1.x*pt2.y-pt1.y*pt2.x)*(pt3.x-pt4.x)-
+                 (pt1.x-pt2.x)*(pt3.x*pt4.y-pt3.y*pt4.x))/denom
+            y = ((pt1.x*pt2.y-pt1.y*pt2.x)*(pt3.y-pt4.y)-
+                 (pt1.y-pt2.y)*(pt3.x*pt4.y-pt3.y*pt4.x))/denom
         except ZeroDivisionError:
             return
         return x, y
+    
     
     # Filtro dei punti (mode == x, y, xy)
     def filter_points(self, glyph, mode):
@@ -107,6 +118,7 @@ class typeStats:
         
         # Restituzione lista
         return list_points
+    
         
     # Funzione che copia il glifo in una nuova cassa e lo appiattisce
     def copyAndFlat(self, glyphName, font, precision):
@@ -124,7 +136,9 @@ class typeStats:
         flattenGlyph(glyph_flat, precision)
         
         return glyph_flat
-        
+    
+    
+    # Funzione in grado di calcolare la lunghezza di un contorno    
     def contourLength(self, con):
         # Lista vuota che dovrà accogliere le misure
         lista_misure = [] 
@@ -162,7 +176,9 @@ class typeStats:
         # Sommatoria delle misure prese
         length = sum(lista_misure)
         
+        # Restituzione lunghezza tracciato
         return length
+    
         
     # Procedura in grado di disegnare un rettangolo
     def rect(self, glyph, x_center, y_center, width, height):
@@ -180,6 +196,7 @@ class typeStats:
         pen.closePath()
         glyph.update()
         
+    
     # Procedura che separa correttamente contorno interno/esterno della o
     def contours_separation(self, glyph):
         
@@ -210,7 +227,7 @@ class typeStats:
         return livello_interno, livello_esterno
     
 
-    # Funzione per il calcolo dell'xHeight minuscola
+    # Funzione per il calcolo dell'xHeight, maiuscola e minuscola
     def xHeight(self, font, case):
         
         # Apertura del glifo corretto nella cassa
@@ -374,7 +391,9 @@ class typeStats:
         
         # Restituzione del valore
         return contrast, angle_min_thick
-        
+    
+    
+    # Funzione in grado di calcolare l'overshooting    
     def overshooting(self, font, xHeight, posizione):
         # Apertura del glifo nella cassa
         o = font['o']
@@ -409,6 +428,8 @@ class typeStats:
         # Restituzione del valore
         return overshooting
     
+    
+    # Funzione in grado di calcolare le ascendenti
     def ascenders(self, font, overshooting_superiore):
         
         # Apertura del glifo in cassa
@@ -431,6 +452,8 @@ class typeStats:
         # Restituzione della variabile
         return ascenders
     
+    
+    # Funzione in grado di calcolare le discendenti
     def descenders(self, font):
         # Apertura del glifo in cassa
         p = font['p']
@@ -457,7 +480,9 @@ class typeStats:
         
         # Restituzione della variabile
         return descenders
-        
+    
+    
+    # Funzione in grado di calcolare l'espansione della 'n'     
     def exp_n(self, font):
         # Apertura glifo nella cassa
         n = font['n']
@@ -504,6 +529,7 @@ class typeStats:
         return expansion_n
         
     
+    # Funzione in grado di calcolare l'espansione della 'o'
     def exp_o(self, font, case): # Aggiungere case
         
         # Apertura del glifo nella cassa
@@ -550,7 +576,9 @@ class typeStats:
         
         # Restituzione variabile
         return expansion_o
-        
+    
+    
+    # Funzione in grado di calcolare l'espansione della 'R'    
     def exp_R(self, font):
                 
         # Apertura glifo nella cassa
@@ -620,7 +648,8 @@ class typeStats:
         # Restituzione variabile
         return expansion_R
         
-    # Funzione in grado di calcolare la squadratura di un contorno (completamente curvo)
+    
+    # Funzione in grado di calcolare la squadratura di un contorno (interamente curvo)
     def contour_squaring(self, glifo_verifica, con):
         # Ciclo che itera sul contorno interno
         lista_squadrature = []
@@ -641,7 +670,6 @@ class typeStats:
                 
                 # Intersezione manipolatori
                 intersection = stats.intersect(pt0, pt1, pt2, pt3)
-                print intersection
                 
                 # Verifica visiva intersezioni
                 stats.rect(glifo_verifica, intersection[0], intersection[1], 2, 2)
@@ -662,7 +690,8 @@ class typeStats:
             
         return sq_contorno
         
-        
+    
+    # Calcolo squadratura della 'o'
     def squaring_o(self, font):
         
         # Apertura del glifo nella cassa
@@ -716,9 +745,9 @@ weight = stats.weight(temp_font)
 print "Peso:\t\t\t\t", weight
 
 ## Contrasto del carattere e angolo dello spessore minore
-#contrasto, angle_min_thick = stats.contrast(temp_font)
-#print "Contrasto:\t\t\t", contrasto
-#print "Angolo spess min:\t", angle_min_thick
+contrasto, angle_min_thick = stats.contrast(temp_font)
+print "Contrasto:\t\t\t", contrasto
+print "Angolo spess min:\t", angle_min_thick
 
 # Calcolo dell'overshooting superiore
 overshooting_superiore = stats.overshooting(temp_font, xHeight, 'superiore')

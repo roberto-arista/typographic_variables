@@ -20,6 +20,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
+"""
+To do:
+    - riconoscimento grazie
+    - riconoscimento larghezza
+
+"""
+
 ### Importazione moduli esterni
 import robofab
 from robofab.world import *
@@ -27,6 +34,7 @@ import numpy
 from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength, distance
 from operator import itemgetter
 from math import fabs, hypot, atan, degrees
+import string
 import sys
 
 
@@ -710,8 +718,81 @@ class typeStats:
         
         # Restituzione variabile
         return squadratura_media, squadratura_interna, squadratura_esterna
+      
+        
+    # Funzione in grado di riconoscere la presenza di grazie o meno
+    def serif_sniffer(self, font):
+        
+        # Calcolo xHeight
+        xHeight = stats.xHeight(font, 'lowercase')
+        
+        # Apertura del glifo nella cassa
+        i = font['i']
+        
+        # Copia ed appiattimento
+        i_flat = stats.copyAndFlat('i', font, 2)
+        
+        # Filtraggio e arrotondamento delle ascisse dei punti di ancoraggio
+        list_xy = stats.filter_points(i_flat, 'xy')
+        
+        # Coordinate punti della parte bassa della lettera
+        list_xy_down = [coo for coo in list_xy if coo[1] < xHeight/2.0]
+        
+        # Selezione delle ascisse
+        list_x = [round(coo[0]) for coo in list_xy_down]
 
-
+        # Creazione di un dizionario che colleziona le occorrenze di valori della lista
+        occurrences = stats.occurDict(list_x)
+        
+        # Riordino del dizionario per ricorrenze
+        dict_occurrences = sorted(occurrences.items(), key=itemgetter(1))
+        
+        # Selezione e riordino degli estremi
+        estremi = dict_occurrences[-2:]
+        estremi = [item[0] for item in estremi]
+        estremi.sort()
+        
+        # Estrapolazione singole ascisse estremi
+        estremo_1 = estremi[-1]
+        estremo_2 = estremi[-2]
+        
+        for abscissa in list_x:
+            if abscissa >=  estremo_1+20:
+                right = True
+            if abscissa <=  estremo_2-20:
+                left = True
+        
+        if right == True and left == True:
+            serif_style = 'Serif'
+        else:
+            serif_style = 'Sans'
+        
+        # Restituzione variabile
+        return serif_style
+        
+        
+    # Funzione in grado di riconoscere un mono da un proporzionale
+    def width_sniffer(self, font):
+        
+        # Lista che accoglierà le misure delle larghezze indagate
+        larghezze = []
+        
+        # Lista che itera sui glifi minuscoli
+        for glyphName in string.lowercase:
+            glyph = font[glyphName]
+            
+            # Inserimento dei valori di larghezza in lista
+            larghezze.append(glyph.width)
+        
+        if len(set(iterator)) <= 1:
+            width_style == 'mono'
+        else:
+            width_style == 'proportional'
+        
+        # Restituzione variabile
+        return width_style
+        
+        
 ### Variabili
 # Dichiarazione del percorso della font da analizzare
 input_path = "test.ufo"
@@ -745,9 +826,9 @@ weight = stats.weight(temp_font)
 print "Peso:\t\t\t\t", weight
 
 ## Contrasto del carattere e angolo dello spessore minore
-contrasto, angle_min_thick = stats.contrast(temp_font)
-print "Contrasto:\t\t\t", contrasto
-print "Angolo spess min:\t", angle_min_thick
+#contrasto, angle_min_thick = stats.contrast(temp_font)
+#print "Contrasto:\t\t\t", contrasto
+#print "Angolo spess min:\t", angle_min_thick
 
 # Calcolo dell'overshooting superiore
 overshooting_superiore = stats.overshooting(temp_font, xHeight, 'superiore')
@@ -794,6 +875,14 @@ squaring_o, squaring_int_o, squaring_est_o = stats.squaring_o(temp_font)
 print "Squadratura media della o: ", squaring_o
 print "Squadratura interna della o: ", squaring_int_o
 print "Squadratura esterna della o: ", squaring_est_o
+
+# Presenza di grazie
+serifs = stats.serif_sniffer(temp_font)
+print "Presenza di grazie: ", serifs
+
+## Tipologia di spaziatura
+width = stats.width_sniffer(temp_font)
+print "Tipologia di spaziatura: ", width
 
 # Salvataggio della font con i parametri di misurazione
 temp_font.save(input_path[:-4]+'_typeStats.ufo')

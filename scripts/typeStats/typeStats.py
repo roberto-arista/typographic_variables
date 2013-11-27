@@ -20,14 +20,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-### Importazione moduli esterni
+### Modules
 import robofab
 from robofab.world import *
 from robofab.interface.all.dialogs import Message, AskYesNoCancel, GetFolder
-#import numpy
 from robofab.pens.filterPen import flattenGlyph, _estimateCubicCurveLength, distance
-from operator import itemgetter
 from math import fabs, hypot, atan, degrees
+from operator import itemgetter
 import datetime
 import string
 import csv

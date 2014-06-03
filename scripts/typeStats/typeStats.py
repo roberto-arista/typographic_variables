@@ -41,6 +41,7 @@ class typeStats:
       
     # Start dialog  
     def startDialog(self):
+        
         # Welcome message!
         Message("Hi! My name is typeStats.")
         
@@ -906,7 +907,7 @@ input_path, verboso = stats.startDialog()
 
 # Opening the csv file
 csvfile = open('typeStatsDB.csv', 'wb')
-statsWriter = csv.writer(csvfile)
+statsWriter = csv.writer(csvfile, csv.QUOTE_ALL)
 
 # Columns headings
 statsWriter.writerow(['familyName', 
